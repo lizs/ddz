@@ -1,42 +1,47 @@
 ﻿#include "ddz.h"
 #include <algorithm>
-#include <cstdarg>
 #include <sstream>
 
 namespace DDZ
 {
-	byte Util::get_value(byte mask)
+	std::vector<short> Util::clone_cards_mask()
 	{
-		return mask & Number;
+		return std::vector<short>(CardsMask);
 	}
 
-	byte Util::get_color(byte mask)
+	short Util::get_value(short card)
 	{
-		return (mask & Color) >> 4;
+		return card & Mask::Value;
 	}
 
-	std::wstring Util::get_description(byte card)
+	short Util::get_color(short card)
+	{
+		return card & Mask::Color;
+	}
+
+	std::wstring Util::get_description(short card)
 	{
 		auto color = get_color(card);
-		auto value = get_logical_value(card);
+		auto value = get_value(card);
 
 		std::wstringstream description;
 		switch (color)
 		{
-		case 0:
+		case Color::Square:
 			description << L"♦";
 			break;
-		case 1:
+		case Color::Plum:
 			description << L"♣";
 			break;
-		case 2:
+		case Color::RedHeart:
 			description << L"♥";
 			break;
-		case 3:
+		case Color::BlackHeart:
 			description << L"♠";
 			break;
-		case 4:
-			description << L"";	// 毛
+		case Color::Queen:
+		case Color::King:
+			description << L"";
 			break;
 
 		default:
@@ -65,11 +70,19 @@ namespace DDZ
 				break;
 
 			case 14:
-				description << (color == 4 ? L"King" : L"A");
+				description << L"A";
 				break;
 
 			case 15:
-				description << (color == 4 ? L"God" : L"2");
+				description << L"2";
+				break;
+
+			case 16:
+				description << L"Queen";
+				break;
+
+			case 17:
+				description << L"King";
 				break;
 			}
 		}
@@ -77,345 +90,270 @@ namespace DDZ
 		return std::move(description.str());
 	}
 
-	std::wstring Util::get_description(byte* cards, byte cnt)
+	std::wstring Util::get_description(const std::vector<short> & cards)
 	{
 		std::wstringstream ss;
-		for(auto i = 0; i < cnt; ++i)
+		for(auto card : cards)
 		{
-			ss << get_description(cards[i]);
+			ss << get_description(card);
 			ss << "\t";
 		}
 
 		return ss.str();
 	}
 
-	byte Util::get_logical_value(byte card)
+	void Util::shuffle_cards(std::vector<short>& cards)
 	{
-		auto color = get_color(card);
-		auto number = get_value(card);
-
-		// 大小王
-		if (color == 0x40)
-		{
-			number += 15;
-		}
-		// A/2
-		else if (number <= 2 && number > 0)
-		{
-			number += 13;
-		}
-
-		return number;
+		std::random_shuffle(cards.begin(), cards.end());
 	}
 
-	void Util::get_logical_values(byte* inputCards, byte inputLen, byte** outputCards, byte outputLen)
+	void Util::sort_cards(std::vector<short>& cards, bool l2h)
 	{
-		if (outputLen < inputLen)
-			throw std::exception("get_logical_values failed, output buffer not enough!");
-
-		memset(*outputCards, 0, outputLen);
-		for (auto i = 0; i < inputLen; ++i)
-		{
-			(*outputCards)[i] = get_logical_value(inputCards[i]);
-		}
-	}
-
-	void Util::clone_cards_mask(byte* output, byte bufSize)
-	{
-		memset(output, 0, bufSize);
-		auto error = memcpy_s(output, bufSize, CardsMask, TotalCardsCount);
-		if (error != 0)
-			throw std::exception("clone_cards_mask failed! error = " + error);
-	}
-
-	void Util::shuffle_cards(byte* cards, byte cnt)
-	{
-		if (!verify_arguments(cards, cnt))
+		if (cards.size() == 1)
 			return;
 
-		std::random_shuffle(cards, cards + cnt);
-	}
-
-	bool Util::verify_arguments(byte* cards, byte cnt)
-	{
-		if (cards == nullptr || cnt == 0)
-		{
-#ifdef _DEBUG
-			throw std::exception("Invalid arguments");
-#else
-			return false;
-#endif
-		}
-
-		return true;
-	}
-
-	bool Util::verify_arguments(byte* cards, byte cnt, byte begin, byte end)
-	{
-		auto ret = verify_arguments(cards, cnt);
-		if (!ret)
-			return false;
-
-		if (begin > end || end > cnt)
-		{
-#ifdef _DEBUG
-			throw std::exception("Invalid arguments");
-#else
-			return false;
-#endif
-		}
-
-		return true;
-	}
-
-	void Util::sort_cards(byte* cards, byte cnt, bool orderFromSmallToLarge)
-	{
-		if (!verify_arguments(cards, cnt))
-			return;
-
-		if (cnt == 1)
-			return;
-
-		std::sort(cards, cards + cnt, [=](byte a, byte b)
+		std::sort(cards.begin(), cards.end(), [=](short a, short b)
 		          {
-			          return orderFromSmallToLarge ? get_logical_value(a) < get_logical_value(b) : get_logical_value(a) > get_logical_value(b);
+			          return l2h ? get_value(a) < get_value(b) : get_value(a) > get_value(b);
 		          });
 	}
 
-	bool Util::is_single(byte* cards, byte cnt)
+	bool Util::contains(const std::vector<short>& cards, short card)
 	{
-		if (!verify_arguments(cards, cnt))
-			return false;
-
-		return cnt == 1;
+		return std::find(cards.begin(), cards.end(), card) != cards.end();
 	}
 
-	bool Util::is_double(byte* cards, byte cnt)
+	bool Util::contains(const std::vector<short>& cards, const std::vector<short>& subcards)
 	{
-		if (!verify_arguments(cards, cnt))
-			return false;
-
-		return cnt == 2 && is_equal(cards, cnt, 2, 0, 1);
+		return std::all_of(subcards.begin(), subcards.end(), [&cards](short card)
+		                   {
+			                   return contains(cards, card);
+		                   });
 	}
 
-	bool Util::is_triple(byte* cards, byte cnt)
+	bool Util::is_double(const std::vector<short>& cards)
 	{
-		if (!verify_arguments(cards, cnt))
-			return false;
-
-		return cnt == 3 && is_equal(cards, cnt, 3, 0, 1, 2);
+		if (!verify(cards, 0, 2)) return false;
+		return cards.size() == 2 && is_same(cards);
 	}
 
-	bool Util::is_triple_plus_single(byte* cards, byte cnt)
+	bool Util::is_triple(const std::vector<short>& cards)
 	{
-		if (!verify_arguments(cards, cnt))
-			return false;
-
-		return cnt == 4 && (is_equal(cards, cnt, 3, 0, 1, 2) || is_equal(cards, cnt, 3, 1, 2, 3));
+		if (!verify(cards, 0, 3)) return false;
+		return cards.size() == 3 && is_same(cards);
+	}
+	
+	bool Util::is_triple_plus_single(const std::vector<short>& cards)
+	{
+		return cards.size() == 4 && is_triple_chain_plus_single(cards);
 	}
 
-	bool Util::is_triple_plus_double(byte* cards, byte cnt)
+	bool Util::is_triple_plus_double(const std::vector<short>& cards)
 	{
-		if (!verify_arguments(cards, cnt))
-			return false;
-
-		return cnt == 5 && ((is_equal(cards, cnt, 3, 0, 1, 2) && is_equal(cards, cnt, 2, 3, 4)) || (is_equal(cards, cnt, 3, 2, 3, 4) && is_equal(cards, cnt, 2, 0, 1)));
+		return cards.size() == 5 && is_triple_chain_plus_double(cards);
 	}
 
-	bool Util::is_single_chain(byte* cards, byte cnt)
+	bool Util::is_single_chain(const std::vector<short>& cards)
 	{
-		if (!verify_arguments(cards, cnt))
-			return false;
-
+		auto cnt = cards.size();
 		if (cnt < 5 || cnt > 12)
 			return false;
 
-		return is_sequence(cards, cnt);
+		return is_sequence(cards);
 	}
 
-	bool Util::is_double_chain(byte* cards, byte cnt)
+	bool Util::is_double_chain(const std::vector<short>& cards)
 	{
-		if (!verify_arguments(cards, cnt))
-			return false;
-
+		auto cnt = cards.size();
 		if (cnt % 2 != 0 || cnt < 5)
 			return false;
 
-		return is_double(cards, 2)
-			&& is_sequence(cards, cnt, 0, cnt, [](auto idx)
-			               {
-				               return idx + 2;
-			               })
-			&& is_sequence(cards, cnt, 1, cnt, [](auto idx)
-			               {
-				               return idx + 2;
-			               });
+		return is_sequence(cards, 2);
 	}
 
-	bool Util::is_triple_chain(byte* cards, byte cnt)
+	bool Util::is_triple_chain(const std::vector<short>& cards)
 	{
-		if (!verify_arguments(cards, cnt))
-			return false;
-
+		auto cnt = cards.size();
 		if (cnt % 3 != 0 || cnt < 5)
 			return false;
 
-		return is_triple(cards, cnt)
-			&& is_sequence(cards, cnt, 0, cnt, [](auto idx)
-			               {
-				               return idx + 3;
-			               })
-			&& is_sequence(cards, cnt, 1, cnt, [](auto idx)
-			               {
-				               return idx + 3;
-			               })
-			&& is_sequence(cards, cnt, 2, cnt, [](auto idx)
-			               {
-				               return idx + 3;
-			               });
+		return is_sequence(cards, 3);
 	}
 
-	bool Util::is_quadruple_plus_single(byte* cards, byte cnt)
+	bool Util::is_triple_chain_plus_single(const std::vector<short>& cards)
 	{
-		if (!verify_arguments(cards, cnt))
+		// N*3 + N = 4*N   N∈[1, 5]
+		auto cnt = cards.size();
+		if (cnt % 4 != 0 || cnt < 4 || cnt > 20)
 			return false;
 
-		if (cnt != 6)
-			return false;
+		// 存在三连即可
+		auto n = cnt / 4;
+		for (auto i = 0; i < n; ++i)
+		{
+			if (is_sequence(cards, i, n * 3, 3))
+				return true;
+		}
 
-		return is_bomb(cards, 4)		// 炸弹在左侧
-			|| is_bomb(cards + 1, 4)	// 炸弹在中间
-			|| is_bomb(cards + 2, 4);	// 炸弹在右侧
+		return false;
 	}
 
-	bool Util::is_quadruple_plus_double(byte* cards, byte cnt)
+	bool Util::is_triple_chain_plus_double(const std::vector<short>& cards)
 	{
-		if (!verify_arguments(cards, cnt))
+		// N*3 + N*2 = 5*N   N∈[1, 4]
+		auto cnt = cards.size();
+		if (cnt % 5 != 0 || cnt < 10 || cnt > 20)
 			return false;
 
-		if (cnt != 8)
-			return false;
+		// 存在三连，且其余皆为对子
+		auto n = cnt / 5;
+		for (auto i = 0; i < n; ++i)
+		{
+			auto match = true;
 
-		return (is_bomb(cards, 4) && is_double(cards + 4, 2) && is_double(cards + 6, 2) && !is_bomb(cards + 4, 4))// 炸+对+对
-			|| is_bomb(cards + 2, 4) && is_double(cards, 2) && is_double(cards + 6, 2) // 对+炸+对
-			|| is_double(cards, 2) && is_double(cards + 2, 2) && !is_bomb(cards, 4) && is_bomb(cards + 4, 4); // 对+对+炸
+			// 三连之前的对子
+			for (auto j = 0; j < i; ++j)
+			{
+				if (!is_same(cards, 2 * j, 2))
+				{
+					match = false;
+					break;
+				}
+			}
+
+			// 三连
+			if(match)
+			{
+				if (!is_sequence(cards, i, n * 3, 3))
+				{
+					match = false;
+				}
+			}
+
+			// 三连之后的对子
+			if(match)
+			{
+				auto head = 2 * (i - 1) + n * 3;
+				for (auto j =0; j < n - i; ++j)
+				{
+					if (!is_same(cards, head + 2 * j, 2))
+					{
+						match = false;
+						break;
+					}
+				}
+			}
+
+			if (match)
+				return true;
+		}
+
+		return false;
 	}
 
-	bool Util::is_bomb(byte* cards, byte cnt)
+	bool Util::is_quadruple_plus_single(const std::vector<short>& cards)
 	{
-		if (!verify_arguments(cards, cnt))
+		if (cards.size() != 6)
 			return false;
+
+		// 左中右
+		return is_same(cards, 0, 4)
+			|| is_same(cards, 1, 4)
+			|| is_same(cards, 2, 4);
+	}
+
+	bool Util::is_quadruple_plus_double(const std::vector<short>& cards)
+	{
+		if (cards.size() != 8)
+			return false;
+
+		// 左中右
+		return (is_same(cards, 0, 4) && is_same(cards, 4, 2) && is_same(cards, 6, 2) && !is_same(cards, 4, 4))
+			|| (is_same(cards, 0, 2) && is_same(cards, 2, 4) && is_same(cards, 6, 2)
+			|| (is_same(cards, 0, 2) && is_same(cards, 2, 2) && is_same(cards, 4, 4) && !is_same(cards, 0, 4)));
+	}
+
+	bool Util::is_bomb(const std::vector<short>& cards)
+	{
+		auto cnt = cards.size();
 
 		if (cnt != 4)
 			return false;
 
-		return is_equal(cards, cnt, 4, 0, 1, 2, 3);
+		return is_same(cards);
 	}
 
-	bool Util::is_missile(byte* cards, byte cnt)
+	bool Util::is_missile(const std::vector<short>& cards)
 	{
-		if (!verify_arguments(cards, cnt))
-			return false;
-
+		auto cnt = cards.size();
 		if (cnt != 2)
 			return false;
 
-		return is_equal(cards, cnt, 2, 0, 1, 2, 3);
+		return get_color(cards[0]) == Color::Queen && get_color(cards[1]) == Color::King;
 	}
 
-	bool Util::trait_double(byte* cards, byte cnt, byte** output, byte outputCnt)
+	bool Util::is_same(const std::vector<short>& cards)
 	{
-		if (!verify_arguments(cards, cnt))
-			return false;
-
-
+		return is_same(cards, 0, cards.size());
 	}
 
-	bool Util::is_equal(byte* cards, byte cnt, byte indexesCount, ...)
+	bool Util::is_same(const std::vector<short>& cards, int begin, int cnt)
 	{
-		if (cnt < indexesCount)
-#ifdef _DEBUG
-			throw std::exception("invlid arguments");
-#else
-			return false;
-#endif
+		if (!verify(cards, begin, cnt)) return false;
+		if (cnt < 2) return true;
 
-		auto ret = true;
-
-		va_list vl;
-		va_start(vl, indexesCount);
-
-		auto logic_num = 0;
-		for (auto i = 0; i < indexesCount; ++i)
+		auto expected = get_value(cards[begin]);
+		return std::all_of(cards.begin() + 1, cards.end(), [=](auto card)
 		{
-			auto idx = va_arg(vl, byte);
-			if (logic_num == 0)
-				logic_num = get_logical_value(cards[idx]);
-			else
-			{
-				if (logic_num != get_logical_value(cards[idx]))
-				{
-					ret = false;
-					break;
-				}
-			}
-		}
-
-		va_end(vl);
-
-		return ret;
+			return get_value(card) == expected;
+		});
 	}
 
-	bool Util::is_sequence(byte* cards, byte cnt)
+	bool Util::verify(const std::vector<short>& cards, int begin, int cnt)
 	{
-		return is_sequence(cards, cnt, 0, cnt, [](byte idx)
-		                   {
-			                   return idx + 1;
-		                   });
+		return !(begin < 0 || cnt < 0 || cnt < 0 || cards.size() < begin + cnt);
 	}
 
-	bool Util::is_sequence(byte* cards, byte cnt, byte begin, byte end, indexer indexer)
+	bool Util::is_sequence(const std::vector<short>& cards)
 	{
-		if (!verify_arguments(cards, cnt))
+		return is_sequence(cards, 1);
+	}
+
+	bool Util::is_sequence(const std::vector<short>& cards, int step)
+	{
+		return is_sequence(cards, 0, step);
+	}
+
+	bool Util::is_sequence(const std::vector<short>& cards, int from, int step)
+	{
+		return is_sequence(cards, from, cards.size() - from, step);
+	}
+
+	bool Util::is_sequence(const std::vector<short>& cards, int from, int cnt, int step)
+	{
+		if (!verify(cards, from, cnt))
 			return false;
 
-		auto logic_num = 0;
-		for (auto i = begin; i < end; i = indexer(i))
-		{
-			if (logic_num == 0)
-				logic_num = get_logical_value(cards[i]);
-			else
-			{
-				if (++logic_num != get_logical_value(cards[i]))
-				{
-					return false;
-				}
-			}
-		}
-
-		return true;
-	}
-
-	bool Util::equal_to(byte* cards, byte cnt, byte expected, byte begin, byte end, indexer indexer)
-	{
-		if (!verify_arguments(cards, cnt))
+		if (step < 1 || cnt % step != 0)
 			return false;
 
-		for (auto i = begin; i < end; i = indexer(i))
+		auto expected = 0;
+		for (auto i = from; i < cnt; i += step)
 		{
-			if (get_logical_value(cards[i]) != expected)
+			if (!is_same(cards, i, step))
 				return false;
+
+			if (expected == 0)
+				expected = get_value(cards[i]);
+			else
+			{
+				if (expected != get_value(cards[i]))
+					return false;
+
+				++expected;
+			}
 		}
 
 		return true;
-	}
-
-	bool Util::is_equal(byte* cards, byte cnt, byte begin, byte end, indexer indexer)
-	{
-		if (!verify_arguments(cards, cnt, begin, end))
-			return false;
-
-		auto expected = get_logical_value(cards[begin]);
-		return equal_to(cards, cnt, expected, begin, end, indexer);
 	}
 }

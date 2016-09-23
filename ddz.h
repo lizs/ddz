@@ -1,10 +1,8 @@
 #pragma once
-#include <functional>
+#include <vector>
 
 namespace DDZ
 {
-	typedef unsigned char byte;
-
 	// 类型
 	enum Category
 	{
@@ -41,14 +39,30 @@ namespace DDZ
 	};
 
 	// 掩码
+	// |----|----|----|----|
+	// 保留(4bits)+花色(4bits)+值(8bits)
 	enum Mask
 	{
-		// 初始码
-		Zero = 0x00,
 		// 高4位表征花色
-		Color = 0xF0,
+		Color = 0x0F00,
 		// 低4位表征数字
-		Number = 0x0F,
+		Value = 0x00FF,
+	};
+
+	enum Color
+	{
+		// 方片
+		Square = 0x0100,
+		// 梅花
+		Plum = 0x0200,
+		// 红桃
+		RedHeart = 0x0300,
+		// 黑桃
+		BlackHeart = 0x0400,
+		// 小王
+		Queen = 0x0500,
+		// 大王
+		King = 0x0600,
 	};
 
 	enum Constants
@@ -63,92 +77,82 @@ namespace DDZ
 		TotalCardsCount = 54,
 	};
 
-	// 牌编码
-	const byte CardsMask[TotalCardsCount] =
+	const std::vector<short> CardsMask =
 	{
-		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, //方块 A - K (14,15,3,4,5,...13)
-		0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, //梅花 A - K (14,15,3,4,5,...13)
-		0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, //红桃 A - K (14,15,3,4,5,...13)
-		0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, //黑桃 A - K (14,15,3,4,5,...13)
-		0x4E, 0x4F, //大小王
+		0x0103, 0x0104, 0x0105, 0x0106, 0x0107, 0x0108, 0x0109, 0x010A, 0x010B, 0x010C, 0x010D, 0x010E, 0x010F, //方块 3 -> 10 -> K -> A -> 2
+		0x0203, 0x0204, 0x0205, 0x0206, 0x0207, 0x0208, 0x0209, 0x020A, 0x020B, 0x020C, 0x020D, 0x020E, 0x020F, //梅花 3 -> 10 -> K -> A -> 2
+		0x0303, 0x0304, 0x0305, 0x0306, 0x0307, 0x0308, 0x0309, 0x030A, 0x030B, 0x030C, 0x030D, 0x030E, 0x030F, //红桃 3 -> 10 -> K -> A -> 2
+		0x0403, 0x0404, 0x0405, 0x0406, 0x0407, 0x0408, 0x0409, 0x040A, 0x040B, 0x040C, 0x040D, 0x040E, 0x040F, //黑桃 3 -> 10 -> K -> A -> 2
+		0x0510,	// 小毛
+		0x0611,	// 大毛
 	};
 
 #pragma region 方法
 
 	class Util
 	{
-		// 迭代器
-		//typedef byte(*indexer)(byte);
-		typedef std::function<byte(byte)> indexer;
-
 	public:
 		// 拷贝原始牌码
-		// output 数组大小至少为TotalCardsCount bytes
-		static void clone_cards_mask(byte* output, byte len = TotalCardsCount);
+		static std::vector<short> clone_cards_mask();
 
 		// 获取数字
-		static byte get_value(byte card);
+		static short get_value(short card);
 
 		// 获取花色
-		static byte get_color(byte card);
+		static short get_color(short card);
 
 		// 获取名字
-		static std::wstring get_description(byte card);
+		static std::wstring get_description(short card);
 
 		// 获取描述
-		static std::wstring get_description(byte* cards, byte cnt);
-
-		// 获取逻辑值
-		static byte get_logical_value(byte card);
-
-		// 获取逻辑值
-		static void get_logical_values(byte* inputCards, byte inputLen, byte** outputCards, byte outputLen);
+		static std::wstring get_description(const std::vector<short> & cards);
 
 		// 洗牌
-		static void shuffle_cards(byte* cards, byte cnt);
+		static void shuffle_cards(std::vector<short> & cards);
 
 		// 排序
 		// 默认从大到小排序
-		static void sort_cards(byte* cards, byte cnt, bool orderFromSmallToLarge = false);
+		static void sort_cards(std::vector<short> & cards, bool orderFromSmallToLarge = false);
+
+		// 判断是否存在指定牌
+		static bool contains(const std::vector<short> & cards, short card);
+		static bool contains(const std::vector<short> & cards, const std::vector<short> & subcards);
 
 #pragma region 判断牌型
 
-		static bool is_single(byte* cards, byte cnt);
-		static bool is_double(byte* cards, byte cnt);
-		static bool is_triple(byte* cards, byte cnt);
-		static bool is_triple_plus_single(byte* cards, byte cnt);
-		static bool is_triple_plus_double(byte* cards, byte cnt);
-		static bool is_single_chain(byte* cards, byte cnt);
-		static bool is_double_chain(byte* cards, byte cnt);
-		static bool is_triple_chain(byte* cards, byte cnt);
-		static bool is_quadruple_plus_single(byte* cards, byte cnt);
-		static bool is_quadruple_plus_double(byte* cards, byte cnt);
-		static bool is_bomb(byte* cards, byte cnt);
-		static bool is_missile(byte* cards, byte cnt);
+		static bool is_double(const std::vector<short> & cards);
+		static bool is_triple(const std::vector<short> & cards);
+
+		static bool is_triple_plus_single(const std::vector<short> & cards);
+		static bool is_triple_plus_double(const std::vector<short> & cards);
+		static bool is_single_chain(const std::vector<short> & cards);
+		static bool is_double_chain(const std::vector<short> & cards);
+		static bool is_triple_chain(const std::vector<short> & cards);
+		static bool is_triple_chain_plus_single(const std::vector<short> & cards);
+		static bool is_triple_chain_plus_double(const std::vector<short> & cards);
+		static bool is_quadruple_plus_single(const std::vector<short> & cards);
+		static bool is_quadruple_plus_double(const std::vector<short> & cards);
+		static bool is_bomb(const std::vector<short> & cards);
+		static bool is_missile(const std::vector<short> & cards);
 
 #pragma endregion 
 
 #pragma region 提取牌型
-
-		static bool trait_double(byte* cards, byte cnt, byte** output, byte outputCnt);
-
+		
 #pragma endregion 
 
 	private:
-		// 判断指定索引处的牌是否大小一致
-		static bool is_equal(byte* cards, byte cnt, byte indexesCount, ...);
 		// 判断指定索引区间的牌是否大小一致
-		static bool is_equal(byte* cards, byte cnt, byte begin, byte end, indexer indexer);
+		static bool is_same(const std::vector<short> & cards);
+		static bool is_same(const std::vector<short> & cards, int from, int cnt);
+
+		// 参数校验
+		static bool verify(const std::vector<short> & cards, int from, int cnt);
+
 		// 判断牌是否为序列
-		static bool is_sequence(byte* cards, byte cnt);
-		// 判断指定索引区间的牌是否为序列
-		static bool is_sequence(byte* cards, byte cnt, byte begin, byte end, indexer indexer);
-		// 判断指定索引区间的牌值是否为expected
-		static bool equal_to(byte* cards, byte cnt, byte expected, byte begin, byte end, indexer indexer);
-
-		// 校验参数
-		static bool verify_arguments(byte* cards, byte cnt);
-		static bool verify_arguments(byte* cards, byte cnt, byte begin, byte end);
-
+		static bool is_sequence(const std::vector<short> & cards);
+		static bool is_sequence(const std::vector<short> & cards, int step);
+		static bool is_sequence(const std::vector<short>& cards, int from, int step);
+		static bool is_sequence(const std::vector<short>& cards, int from, int to, int step);
 	};
 }
