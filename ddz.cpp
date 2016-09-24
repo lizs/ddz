@@ -4,6 +4,30 @@
 
 namespace DDZ
 {
+	std::map<short, std::vector<Category>> CategoryMap =
+	{
+		{ 1,{ Single } },
+		{ 2,{ Missile, Double } },
+		{ 3,{ Triple } },
+		{ 4,{ Bomb, TriplePlusSingle } },
+		{ 5,{ SingleChain, TriplePlusDouble } },
+		{ 6,{ SingleChain, DoubleChain, TripleChain, QuadruplePlusSingle } },
+		{ 7,{ SingleChain } },
+		{ 8,{ SingleChain, DoubleChain, TripleChainPlusSingle, QuadruplePlusDouble } },
+		{ 9,{ SingleChain, TripleChain } },
+		{ 10,{ SingleChain, DoubleChain, TripleChainPlusDouble } },
+		{ 11,{ SingleChain } },
+		{ 12,{ SingleChain, DoubleChain, TripleChain, TripleChainPlusSingle } },
+		{ 13,{} },
+		{ 14,{ DoubleChain } },
+		{ 15,{ TripleChain, TripleChainPlusDouble } },
+		{ 16,{ DoubleChain } },
+		{ 17,{} },
+		{ 18,{ DoubleChain, TripleChain } },
+		{ 19,{} },
+		{ 20,{ DoubleChain, TripleChainPlusSingle, TripleChainPlusDouble } },
+	};
+
 	std::vector<short> Util::clone_cards_mask()
 	{
 		return std::vector<short>(CardsMask);
@@ -129,6 +153,11 @@ namespace DDZ
 		                   {
 			                   return contains(cards, card);
 		                   });
+	}
+
+	bool Util::is_single(const std::vector<short>& cards)
+	{
+		return cards.size() == 1;
 	}
 
 	bool Util::is_double(const std::vector<short>& cards)
@@ -290,6 +319,80 @@ namespace DDZ
 			return false;
 
 		return get_color(cards[0]) == Color::Queen && get_color(cards[1]) == Color::King;
+	}
+
+	bool Util::is_category(const std::vector<short>& cards, Category category)
+	{
+		switch (category)
+		{
+		case Category::Bomb:
+			return is_bomb(cards);
+		case Category::Missile:
+			return is_missile(cards);
+
+		case Category::Single:
+			return is_single(cards);
+		case Category::Double:
+			return is_double(cards);
+		case Category::Triple:
+			return is_triple(cards);
+
+		case Category::SingleChain:
+			return is_single_chain(cards);
+		case Category::DoubleChain:
+			return is_double_chain(cards);
+		case Category::TripleChain:
+			return is_triple_chain(cards);
+
+		case Category::TriplePlusSingle:
+			return is_triple_plus_single(cards);
+		case Category::TriplePlusDouble:
+			return is_triple_plus_double(cards);
+
+		case Category::TripleChainPlusSingle:
+			return is_triple_chain_plus_single(cards);
+		case Category::TripleChainPlusDouble:
+			return is_triple_chain_plus_double(cards);
+
+		case Category::QuadruplePlusSingle:
+			return is_quadruple_plus_single(cards);
+		case Category::QuadruplePlusDouble:
+			return is_quadruple_plus_double(cards);
+
+		case Invalid: 
+		default: 
+			return false;
+		}
+	}
+
+	std::vector<short> Util::deal_cards(std::vector<short>& input, int cnt)
+	{
+		if (cnt > input.size()) return std::vector<short>();
+
+		shuffle_cards(input);
+
+		auto ret = std::vector<short>(input.begin(), input.begin() + cnt);
+		input.erase(input.begin(), input.begin() + cnt);
+
+		sort_cards(input);
+		sort_cards(ret);
+
+		return std::move(ret);
+	}
+
+	Category Util::trait_category(const std::vector<short>& input)
+	{
+		auto ret = Category::Invalid;
+		if (input.size() > 20) return ret;
+
+		const auto & possisableCategories = CategoryMap[input.size()];
+		for (auto c : possisableCategories)
+		{
+			if (is_category(input, c))
+				return c;
+		}
+
+		return ret;
 	}
 
 	bool Util::is_same(const std::vector<short>& cards)
